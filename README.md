@@ -15,6 +15,40 @@ The game emphasizes **precision timing**, **strategic combos**, and **reading yo
 
 ---
 
+### Project Structure
+
+```
+googley_fighter/
+│
+├── assets/                 # Game assets (images, sprites, sounds, fonts)
+│   ├── images/             # Character sprites, backgrounds, UI icons
+│   ├── sounds/             # Sound effects and background music
+│   └── fonts/              # Custom fonts used in the game
+│
+├── src/                    # Core source code
+│   ├── __init__.py
+│   ├── main.py             # Game entry point
+│   ├── sprite.py           # Sprite and character handling (animations, states)
+│   ├── gamecanvas.py       # Main game loop, rendering, and input handling
+│   ├── ai.py               # AI logic for single player opponents
+│   ├── controls.py         # Input mapping and event handling
+│   ├── networking.py       # Multiplayer networking (asyncio, sockets)
+│   ├── config.py           # Global configuration (constants, settings)
+│   └── utils/              # Helper functions and utilities
+│       └── __init__.py
+│
+├── tests/                  # Unit and integration tests
+│   ├── test_sprite.py
+│   ├── test_gamecanvas.py
+│   └── test_ai.py
+│
+├── requirements.txt        # Python dependencies
+├── README.md               # This file
+└── project_structure.md    # Project structure and overview
+```
+
+---
+
 ### Tech Stack
 - **Python 3.12**  
 - **Asyncio Library** – for asynchronous networking and event handling  
