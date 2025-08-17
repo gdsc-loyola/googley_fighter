@@ -6,6 +6,7 @@ Googley Fighter - Fighter Sprite Handling
 import pygame
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 from config import GROUND_Y
+from sounds import DAMAGE_SOUND, DEATH_SOUND
 from PIL import Image
 
 
@@ -82,6 +83,11 @@ class Fighter(pygame.sprite.Sprite):
             if self.health < 0:
                 self.health = 0
             self.damage_timer = self.damage_cooldown
+
+            DAMAGE_SOUND.play()  # Play damage sound effect
+
+            if self.health == 0:
+                DEATH_SOUND.play() # Play death sound effect
 
     def attack(self, others):
         """Perform an attack against nearby fighters."""

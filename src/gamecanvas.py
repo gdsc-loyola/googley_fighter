@@ -1,5 +1,6 @@
 import pygame
 import sys
+from sounds import BACKGROUND_SOUND
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 from config import RED_SPAWN, BLUE_SPAWN
 
@@ -54,6 +55,7 @@ class GameCanvas:
         self.state = "menu"
         self.game_over = False
         self.paused = False
+        BACKGROUND_SOUND.stop()
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -64,6 +66,10 @@ class GameCanvas:
                     self.running = False
                 elif event.key == pygame.K_SPACE and self.state == "playing":
                     self.paused = not getattr(self, 'paused', False)
+                    if self.paused:
+                        BACKGROUND_SOUND.stop()
+                    else:
+                        BACKGROUND_SOUND.play(loops=-1)
                 elif event.key == pygame.K_r and self.game_over:
                     self.reset_game()
 
@@ -75,6 +81,8 @@ class GameCanvas:
 
             # Check health
             if self.red_fighter.health <= 0 or self.blue_fighter.health <= 0:
+                if not self.game_over:
+                    BACKGROUND_SOUND.stop()
                 self.game_over = True
 
             # Decrease countdown timer
@@ -202,9 +210,11 @@ class GameCanvas:
                 if sp_button_rect.collidepoint(mouse_pos):
                     selected_mode = "singleplayer"
                     self.state = "playing"
+                    BACKGROUND_SOUND.play(loops=1)
                     menu_running = False
                 elif mp_button_rect.collidepoint(mouse_pos):
                     selected_mode = "multiplayer"
+                    BACKGROUND_SOUND.play(loops=-1)
                     self.state = "playing"
                     menu_running = False
 
