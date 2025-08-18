@@ -1,41 +1,63 @@
 # src/ai.py
-"""
-Googley Fighter - Basic AI for Singleplayer
-"""
+import random
+from config import AI_ATTACK_RANGE, AI_ATTACK_COOLDOWN
 
-class SimpleAI:
-    """
-    Simple AI that follows the opponent horizontally and occasionally jumps.
-    """
 
-    def __init__(self, fighter, target_fighter, speed=3):
-        self.fighter = fighter          # the AI-controlled Fighter
-        self.target = target_fighter    # the opponent Fighter
-        self.speed = speed
-        self.jump_cooldown = 0          # frames until next jump allowed
+class AIControls:
+    """Fake controls to drive a Fighter using AI logic (slower but not too weak)."""
 
-    def get_input(self):
+    def __init__(self, fighter, target, config):
+        self.fighter = fighter
+        self.target = target
+        self.config = config
+        self.attack_cooldown = 0
+        self.move_cooldown = 0   # delay between movement updates
+
+    def get_input(self, fighter):
         """
-        Returns (dx, dy) movement values for the AI.
-        dx: -1 left, 1 right, 0 no horizontal movement
-        dy: -1 up (jump), 0 no vertical movement
+        Returns (dx, dy, attack) like player controls.
+        dx: -1 (left), 0 (idle), +1 (right)
+        dy: -1 for jump
+        attack: True/False
         """
-        dx = 0
-        dy = 0
+        if self.attack_cooldown > 0:
+            self.attack_cooldown -= 1
+        if self.move_cooldown > 0:
+            self.move_cooldown -= 1
 
-        # Horizontal movement: move toward the target
-        if self.fighter.rect.x < self.target.rect.x - 5:
-            dx = 1
-        elif self.fighter.rect.x > self.target.rect.x + 5:
-            dx = -1
+        dx, dy, attack = 0, 0, False
 
-        # Simple jump logic: jump occasionally if near player
-        if self.jump_cooldown > 0:
-            self.jump_cooldown -= 1
-        else:
-            distance_x = abs(self.fighter.rect.x - self.target.rect.x)
-            if distance_x < 100 and self.fighter.rect.bottom >= 500:  # on ground
-                dy = -1  # jump
-                self.jump_cooldown = 60  # wait 1 second before next jump
+        # Distance between AI and player
+        dx_to_player = self.target.rect.centerx - self.fighter.rect.centerx
+        distance = abs(dx_to_player)
 
-        return dx, dy
+        # Health ratio for decision making
+        health_ratio = self.fighter.health / self.fighter.max_health
+
+        # Only update movement every few frames
+        if self.move_cooldown == 0:
+            # Evade if low health
+            if health_ratio < 0.3 and distance < AI_ATTACK_RANGE:
+                # Move away from player
+                dx = -1 if dx_to_player > 0 else 1
+            else:
+                # Normal behavior: approach player if too far
+                if distance > AI_ATTACK_RANGE:
+                    dx = 1 if dx_to_player > 0 else -1
+                else:
+                    dx = 0
+
+            # Attack logic more aggressive if health is low
+            attack_chance = 0.2 if health_ratio < 0.3 else 0.05
+            if self.attack_cooldown == 0 and random.random() < attack_chance:
+                attack = True
+                self.attack_cooldown = max(10, AI_ATTACK_COOLDOWN // 2 if health_ratio < 0.3 else AI_ATTACK_COOLDOWN)
+
+            # Reset move cooldown
+            self.move_cooldown = 4
+
+        # Small chance to jump randomly, higher if low health
+        if random.random() < (0.01 if health_ratio < 0.3 else 0.002):
+            dy = -1
+
+        return dx, dy, attack
