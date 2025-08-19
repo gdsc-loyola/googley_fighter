@@ -1,6 +1,9 @@
 import pygame
 import sys
+import config
 from sounds import BACKGROUND_SOUND
+from controls import Player2Controls
+from ai import AIControls
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 from config import RED_SPAWN, BLUE_SPAWN
 
@@ -11,6 +14,8 @@ class GameCanvas:
         self.fighters = fighters_group
         self.red_fighter = red_fighter
         self.blue_fighter = blue_fighter
+        self.fight_start_time = None
+        self.selected_mode = None
 
         # Initialize PyGame display
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -46,10 +51,16 @@ class GameCanvas:
         self.red_fighter.damage_timer = 0
         self.blue_fighter.damage_timer = 0
         self.time_remaining = self.total_time
+        self.fight_start_time = None
 
         # Reset positions
         self.red_fighter.rect.topleft = RED_SPAWN
         self.blue_fighter.rect.topleft = BLUE_SPAWN
+
+        if self.selected_mode == "singleplayer":
+            self.blue_fighter.controls = AIControls(self.blue_fighter, self.red_fighter, config)
+        else:
+            self.blue_fighter.controls = Player2Controls()
 
         # Switch to the game state
         self.state = "menu"
@@ -64,7 +75,7 @@ class GameCanvas:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
-                elif event.key == pygame.K_SPACE and self.state == "playing":
+                elif event.key == pygame.K_SPACE and not self.game_over:
                     self.paused = not getattr(self, 'paused', False)
                     if self.paused:
                         BACKGROUND_SOUND.stop()
@@ -148,6 +159,16 @@ class GameCanvas:
             self.draw_health_bars()
             self.draw_timer()
 
+            # Show "FIGHT" for 0.5 sec at the start
+        if self.fight_start_time:
+            elapsed = (pygame.time.get_ticks() - self.fight_start_time) / 1000  # in seconds
+            if elapsed < 0.5:
+                fight_font = pygame.font.SysFont('Arial', 84, bold=True)
+                fight_surface = fight_font.render("FIGHT!", True, (255, 255, 255))
+                x = SCREEN_WIDTH // 2 - fight_surface.get_width() // 2
+                y = SCREEN_HEIGHT // 2 - fight_surface.get_height() // 2
+                self.screen.blit(fight_surface, (x, y))
+
         # Draw pause and game over messages
         if getattr(self, 'paused', False):
             pause_font = pygame.font.SysFont('Arial', 84, bold=True)
@@ -208,14 +229,18 @@ class GameCanvas:
 
             if mouse_click:
                 if sp_button_rect.collidepoint(mouse_pos):
-                    selected_mode = "singleplayer"
+                    self.selected_mode = "singleplayer"
                     self.state = "playing"
-                    BACKGROUND_SOUND.play(loops=1)
+                    self.fight_start_time = pygame.time.get_ticks()
+                    BACKGROUND_SOUND.play(loops=-1)
+                    self.blue_fighter.controls = AIControls(self.blue_fighter, self.red_fighter, config)
                     menu_running = False
                 elif mp_button_rect.collidepoint(mouse_pos):
-                    selected_mode = "multiplayer"
-                    BACKGROUND_SOUND.play(loops=-1)
+                    self.selected_mode = "multiplayer"
                     self.state = "playing"
+                    self.fight_start_time = pygame.time.get_ticks()
+                    BACKGROUND_SOUND.play(loops=-1)
+                    self.blue_fighter.controls = Player2Controls()
                     menu_running = False
 
             pygame.display.flip()
