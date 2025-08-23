@@ -140,6 +140,48 @@ class GameCanvas:
         self.screen.blit(label1, (self.health_bar_margin, self.health_bar_margin))
         self.screen.blit(label2, (SCREEN_WIDTH - self.health_bar_margin - label2.get_width(), self.health_bar_margin))
 
+    def draw_cooldown_bars(self):
+        """Draw attack cooldown bars for both fighters."""
+        bar_width = 100
+        bar_height = 8
+        margin = 5
+
+        # --- Player 1 Cooldown (under health bar, left) ---
+        if self.red_fighter.attack_cooldown > 0:
+            ratio = 1 - (self.red_fighter.attack_timer / self.red_fighter.attack_cooldown)
+        else:
+            ratio = 1
+        color = (0, 255, 0) if ratio >= 1 else (255, 0, 0)  # green if ready, red if cooling down
+        cooldown_rect = pygame.Rect(
+            self.health_bar_margin,
+            self.health_bar_margin + 20 + self.health_bar_height + margin,
+            int(bar_width * ratio),
+            bar_height
+        )
+        pygame.draw.rect(self.screen, color, cooldown_rect)
+        pygame.draw.rect(self.screen, (255, 255, 255),
+                         pygame.Rect(self.health_bar_margin,
+                                     self.health_bar_margin + 20 + self.health_bar_height + margin,
+                                     bar_width, bar_height), 2)
+
+        # --- Player 2 Cooldown (under health bar, right) ---
+        if self.blue_fighter.attack_cooldown > 0:
+            ratio = 1 - (self.blue_fighter.attack_timer / self.blue_fighter.attack_cooldown)
+        else:
+            ratio = 1
+        color = (0, 255, 0) if ratio >= 1 else (255, 0, 0)
+        cooldown_rect = pygame.Rect(
+            SCREEN_WIDTH - self.health_bar_margin - bar_width,
+            self.health_bar_margin + 20 + self.health_bar_height + margin,
+            int(bar_width * ratio),
+            bar_height
+        )
+        pygame.draw.rect(self.screen, color, cooldown_rect)
+        pygame.draw.rect(self.screen, (255, 255, 255),
+                         pygame.Rect(SCREEN_WIDTH - self.health_bar_margin - bar_width,
+                                     self.health_bar_margin + 20 + self.health_bar_height + margin,
+                                     bar_width, bar_height), 2)
+
     def draw_timer(self):
         remaining = max(0, int(self.time_remaining))
         minutes = remaining // 60
@@ -159,6 +201,7 @@ class GameCanvas:
         elif self.state == "playing":
             self.fighters.draw(self.screen)
             self.draw_health_bars()
+            self.draw_cooldown_bars()
             self.draw_timer()
 
             # Show "FIGHT" for 0.5 sec at the start
