@@ -1,8 +1,10 @@
 import pygame
 import sys
 import config
+from PIL import Image
 from sounds import BACKGROUND_SOUND
-from controls import Player2Controls
+from sprite import create_fighters
+from controls import Player1Controls, Player2Controls
 from ai import AIControls
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 from config import RED_SPAWN, BLUE_SPAWN
@@ -204,8 +206,6 @@ class GameCanvas:
         sp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 - 80, button_width, button_height)
         mp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 20, button_width, button_height)
 
-        selected_mode = None
-
         while menu_running:
             self.handle_events()
             mouse_pos = pygame.mouse.get_pos()
@@ -230,23 +230,171 @@ class GameCanvas:
             if mouse_click:
                 if sp_button_rect.collidepoint(mouse_pos):
                     self.selected_mode = "singleplayer"
-                    self.state = "playing"
-                    self.fight_start_time = pygame.time.get_ticks()
+                    self.state = "character_select"
                     BACKGROUND_SOUND.play(loops=-1)
-                    self.blue_fighter.controls = AIControls(self.blue_fighter, self.red_fighter, config)
                     menu_running = False
                 elif mp_button_rect.collidepoint(mouse_pos):
                     self.selected_mode = "multiplayer"
-                    self.state = "playing"
-                    self.fight_start_time = pygame.time.get_ticks()
+                    self.state = "character_select"
                     BACKGROUND_SOUND.play(loops=-1)
-                    self.blue_fighter.controls = Player2Controls()
                     menu_running = False
 
             pygame.display.flip()
             self.clock.tick(FPS)
 
-        return selected_mode
+    def load_gif_frames(self, path, scale=None):
+        """Load GIF frames as a list of PyGame surfaces."""
+        pil_img = Image.open(path)
+        frames = []
+        palette = pil_img.getpalette()  # store palette for reuse
+
+        try:
+            while True:
+                frame = pil_img.convert("RGBA")  # ensure proper format
+                if scale:
+                    frame = frame.resize(scale, Image.NEAREST)
+
+                # Only apply palette if image mode is "P"
+                if pil_img.mode == "P" and palette:
+                    pil_img.putpalette(palette)
+
+                mode = frame.mode
+                size = frame.size
+                data = frame.tobytes()
+                surface = pygame.image.fromstring(data, size, mode)
+                frames.append(surface)
+                pil_img.seek(pil_img.tell() + 1)
+        except EOFError:
+            pass
+
+        return frames
+
+    def start_fight(self):
+        """Initialize fighters after character selection."""
+        player1_controls = Player1Controls()
+
+        if self.selected_mode == "singleplayer":
+            player2_controls = Player2Controls()  # still give dummy, AI replaces below
+        else:
+            player2_controls = Player2Controls()
+
+        # Create fighters
+        self.fighters, self.red_fighter, self.blue_fighter = create_fighters(
+            self.player1_choice,
+            self.player2_choice,
+            player1_controls,
+            player2_controls
+        )
+
+        # Apply AI if singleplayer
+        if self.selected_mode == "singleplayer":
+            self.blue_fighter.controls = AIControls(self.blue_fighter, self.red_fighter, config)
+
+        self.state = "playing"
+        self.fight_start_time = pygame.time.get_ticks()
+        BACKGROUND_SOUND.play(loops=-1)
+
+    def character_select(self):
+        """Show character selection screen for singleplayer or multiplayer."""
+        choosing = True
+        font = pygame.font.SysFont("Arial", 36, bold=True)
+
+        box_size = 120
+        spacing = 150
+        num_boxes = 3
+        total_width = num_boxes * box_size + (num_boxes - 1) * spacing
+        start_x = (SCREEN_WIDTH - total_width) // 2
+        y = SCREEN_HEIGHT // 2 - box_size // 2
+
+        boxes = [
+            pygame.Rect(start_x + i * (box_size + spacing), y, box_size, box_size)
+            for i in range(num_boxes)
+        ]
+
+        characters = ["Googley", "Steve", "Alex"]
+
+        # 🔹 Load animated frames for previews
+        previews = {
+            "Googley": self.load_gif_frames("assets/images/googley/idle.gif", scale=(64, 64)),
+            "Steve": self.load_gif_frames("assets/images/steve/idle.gif", scale=(64, 64)),
+            "Alex": self.load_gif_frames("assets/images/alex/idle.gif", scale=(64, 64)),
+        }
+
+        # 🔹 Track animation state
+        frame_index = {char: 0 for char in characters}
+        frame_timer = 0
+        frame_delay = 150  # ms per frame (adjust for speed)
+
+        turn = 1  # 1 = player1 choosing, 2 = player2 choosing (multiplayer only)
+
+        while choosing:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for i, box in enumerate(boxes):
+                        if box.collidepoint(event.pos):
+                            if self.selected_mode == "singleplayer":
+                                self.player1_choice = characters[i]
+                                self.player2_choice = "Googley"  # default AI opponent
+                                choosing = False
+
+                            elif self.selected_mode == "multiplayer":
+                                if turn == 1:
+                                    self.player1_choice = characters[i]
+                                    turn = 2
+                                else:
+                                    if characters[i] == self.player1_choice:
+                                        continue
+                                    self.player2_choice = characters[i]
+                                    choosing = False
+
+            self.handle_events()
+            mouse_pos = pygame.mouse.get_pos()
+
+            self.screen.blit(self.background, (0, 0))
+
+            # Caption
+            if self.selected_mode == "multiplayer" and turn == 2:
+                caption = font.render("Player 2, choose your character", True, (255, 255, 255))
+            else:
+                caption = font.render("Player 1, choose your character", True, (255, 255, 255))
+
+            self.screen.blit(caption, (SCREEN_WIDTH // 2 - caption.get_width() // 2, 100))
+
+            # 🔹 Update animation every frame_delay ms
+            frame_timer += self.clock.get_time()
+            if frame_timer >= frame_delay:
+                for char in characters:
+                    frame_index[char] = (frame_index[char] + 1) % len(previews[char])
+                frame_timer = 0
+
+            # Draw character boxes
+            for i, box in enumerate(boxes):
+                color = (100, 100, 100) if box.collidepoint(mouse_pos) else (50, 50, 50)
+                pygame.draw.rect(self.screen, color, box)
+                pygame.draw.rect(self.screen, (255, 255, 255), box, 3)
+
+                # 🔹 Draw animated frame
+                char = characters[i]
+                preview_img = previews[char][frame_index[char]]
+                self.screen.blit(
+                    preview_img,
+                    (box.centerx - preview_img.get_width() // 2,
+                    box.centery - preview_img.get_height() // 2),
+                )
+
+                # Label
+                label_surface = self.font.render(char, True, (255, 255, 255))
+                self.screen.blit(label_surface, (box.centerx - label_surface.get_width() // 2, box.bottom + 10))
+
+            pygame.display.flip()
+            self.clock.tick(FPS)
+
+        # After selection, start fight
+        self.start_fight()
 
     def run(self):
         self.paused = False
@@ -254,7 +402,11 @@ class GameCanvas:
         while self.running:
             self.handle_events()
 
-            if not self.paused and not self.game_over and self.state == "playing":
+            if self.state == "menu":
+                self.start_menu()
+            elif self.state == "character_select":
+                self.character_select()
+            elif not self.paused and not self.game_over and self.state == "playing":
                 self.update()
 
             self.render()
