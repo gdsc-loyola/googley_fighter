@@ -1,7 +1,5 @@
 import pygame
 from PIL import Image
-from sprite import create_fighters
-from controls import Player1Controls, Player2Controls
 from gamecanvas import GameCanvas
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
@@ -16,18 +14,14 @@ def main():
     pygame.init()
 
     # Load background
-    background_path = "assets/images/background.avif"
+    background_path = "assets/images/background.png"
     background_surface = load_avif_as_surface(background_path)
 
-    # Initialize fighters
-    player1_controls = Player1Controls()
-    player2_controls = Player2Controls()
-    fighters, red_fighter, blue_fighter = create_fighters(player1_controls, player2_controls)
-
     # Create game canvas and run
-    game = GameCanvas(background_surface, fighters, red_fighter, blue_fighter)
+    game = GameCanvas(background_surface, None, None, None)
     game.run()
 
 
 if __name__ == "__main__":
+
     main()
