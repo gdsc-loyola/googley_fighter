@@ -1,3 +1,4 @@
+import os
 import pygame
 import sys
 import config
@@ -20,6 +21,8 @@ class GameCanvas:
         self.selected_mode = None
 
         # Initialize PyGame display
+        font_path = os.path.join("assets", "fonts", "Minecraft.ttf")
+        self.font =pygame.font.Font(font_path)
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Googley Fighter")
         self.clock = pygame.time.Clock()
@@ -39,7 +42,6 @@ class GameCanvas:
         self.start_ticks = pygame.time.get_ticks()  # starting time
 
         # Fonts
-        self.font = pygame.font.SysFont('Arial', 18, bold=True)
         self.label_color = (255, 255, 255)  # white for player labels
 
         self.state = "menu" # initial state
@@ -77,7 +79,7 @@ class GameCanvas:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
-                elif event.key == pygame.K_SPACE and not self.game_over:
+                elif event.key == pygame.K_p and not self.game_over:
                     self.paused = not getattr(self, 'paused', False)
                     if self.paused:
                         BACKGROUND_SOUND.stop()
@@ -208,7 +210,7 @@ class GameCanvas:
         if self.fight_start_time:
             elapsed = (pygame.time.get_ticks() - self.fight_start_time) / 1000  # in seconds
             if elapsed < 0.5:
-                fight_font = pygame.font.SysFont('Arial', 84, bold=True)
+                fight_font = pygame.font.SysFont('font_path', 84, bold=True)
                 fight_surface = fight_font.render("FIGHT!", True, (255, 255, 255))
                 x = SCREEN_WIDTH // 2 - fight_surface.get_width() // 2
                 y = SCREEN_HEIGHT // 2 - fight_surface.get_height() // 2
@@ -216,22 +218,68 @@ class GameCanvas:
 
         # Draw pause and game over messages
         if getattr(self, 'paused', False):
-            pause_font = pygame.font.SysFont('Arial', 84, bold=True)
+            pause_font = pygame.font.SysFont('font_path', 84, bold=True) 
             pause_surface = pause_font.render("PAUSED", True, (255, 255, 255))
             x = SCREEN_WIDTH // 2 - pause_surface.get_width() // 2
-            y = SCREEN_HEIGHT // 2 - pause_surface.get_height() // 2
+            y = SCREEN_HEIGHT // 4 - pause_surface.get_height() // 2
             self.screen.blit(pause_surface, (x, y))
+
+            # --- Pause menu buttons with transparency ---
+            button_font = pygame.font.SysFont('font_path', 36, bold=False)
+            button_color = (50, 50, 50, 180)   # RGBA
+            button_hover = (100, 100, 100, 220)
+            button_width, button_height = 250, 60
+            spacing = 20
+
+            buttons = {
+                "CONTINUE": pygame.Rect(SCREEN_WIDTH//2 - button_width//2,
+                                        y + pause_surface.get_height() + 40,
+                                        button_width, button_height),
+                "RESTART": pygame.Rect(SCREEN_WIDTH//2 - button_width//2,
+                                    y + pause_surface.get_height() + 40 + (button_height + spacing),
+                                    button_width, button_height),
+                "MENU": pygame.Rect(SCREEN_WIDTH//2 - button_width//2,
+                                    y + pause_surface.get_height() + 40 + 2*(button_height + spacing),
+                                    button_width, button_height)
+            }
+
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_click = pygame.mouse.get_pressed()[0]
+
+            for label, rect in buttons.items():
+                # Transparent button surface
+                temp_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+                color = button_hover if rect.collidepoint(mouse_pos) else button_color
+                temp_surf.fill(color)
+                self.screen.blit(temp_surf, rect.topleft)
+
+                # Draw text
+                text_surf = button_font.render(label, True, (255, 255, 255))
+                self.screen.blit(text_surf, (rect.centerx - text_surf.get_width()//2,
+                                            rect.centery - text_surf.get_height()//2))
+
+                if mouse_click and rect.collidepoint(mouse_pos):
+                    if label == "CONTINUE":
+                        self.paused = False
+                        BACKGROUND_SOUND.play(loops=-1)
+                    elif label == "RESTART":
+                        self.reset_game()
+                        self.state = "playing"
+                        self.start_fight()
+                    elif label == "MENU":
+                        self.reset_game()
+                        self.state = "menu"
 
         # Draw Game Over message
         if self.game_over:
-            over_font = pygame.font.SysFont('Arial', 84, bold=True)
+            over_font = pygame.font.SysFont('font_path', 84, bold=True)
             over_surface = over_font.render("GAME OVER", True, (255, 255, 255))
             x = SCREEN_WIDTH // 2 - over_surface.get_width() // 2
             y = SCREEN_HEIGHT // 2 - over_surface.get_height() // 2
             self.screen.blit(over_surface, (x, y))
 
             # Show "Press R to play again"
-            hint_font = pygame.font.SysFont('Arial', 36, bold=True)
+            hint_font = pygame.font.SysFont('font_path', 36, bold=True)
             hint_surface = hint_font.render("Press R to play again", True, (255, 255, 255))
             hx = SCREEN_WIDTH // 2 - hint_surface.get_width() // 2
             hy = y + over_surface.get_height() + 20
@@ -241,13 +289,27 @@ class GameCanvas:
 
     def start_menu(self):
         menu_running = True
-        button_font = pygame.font.SysFont("Arial", 36, bold=True)
-        button_color = (50, 50, 50)
-        button_hover = (100, 100, 100)
+        button_font = pygame.font.SysFont("font_path", 36, bold=False)
+        title_font = pygame.font.SysFont("font_path", 84, bold=True)
+        button_color = (50, 50, 50, 180)
+        button_hover = (100, 100, 100, 220)
         button_width, button_height = 300, 60
+        spacing = 100
 
         sp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 - 80, button_width, button_height)
         mp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 20, button_width, button_height)
+        inst_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 120, button_width, button_height)
+
+        # --- Load GIF frames for menu characters ---
+        googley_frames = self.load_gif_frames("assets/images/googley/idle.gif", scale=(64, 64))
+        alex_frames = self.load_gif_frames("assets/images/alex/idle.gif", scale=(64, 64))
+        frame_index = {"Googley": 0, "Alex": 0}
+        frame_timer = 0
+        frame_delay = 150  # milliseconds per frame
+
+        # Position for GIFs
+        googley_pos = (SCREEN_WIDTH//4, SCREEN_HEIGHT//2 + 150)
+        alex_pos = (SCREEN_WIDTH*3//4, SCREEN_HEIGHT//2 + 150)
 
         while menu_running:
             self.handle_events()
@@ -256,19 +318,47 @@ class GameCanvas:
 
             self.screen.blit(self.background, (0, 0))
 
-            # Singleplayer button
-            color = button_hover if sp_button_rect.collidepoint(mouse_pos) else button_color
-            pygame.draw.rect(self.screen, color, sp_button_rect)
-            sp_text = button_font.render("Singleplayer", True, (255, 255, 255))
-            self.screen.blit(sp_text, (sp_button_rect.centerx - sp_text.get_width()//2,
-                                    sp_button_rect.centery - sp_text.get_height()//2))
+             # --- Draw title ---
+            title_surface = title_font.render("GOOGLEY FIGHTER", True, (255, 255, 255))
+            title_x = SCREEN_WIDTH // 2 - title_surface.get_width() // 2
+            title_y = 120  # distance from top
+            self.screen.blit(title_surface, (title_x, title_y))
 
-            # Multiplayer button
-            color = button_hover if mp_button_rect.collidepoint(mouse_pos) else button_color
-            pygame.draw.rect(self.screen, color, mp_button_rect)
-            mp_text = button_font.render("Multiplayer", True, (255, 255, 255))
-            self.screen.blit(mp_text, (mp_button_rect.centerx - mp_text.get_width()//2,
-                                    mp_button_rect.centery - mp_text.get_height()//2))
+            # --- Draw buttons with transparency ---
+            for rect, text, hover in [
+                (sp_button_rect, "Singleplayer", sp_button_rect.collidepoint(mouse_pos)),
+                (mp_button_rect, "Multiplayer", mp_button_rect.collidepoint(mouse_pos)),
+                (inst_button_rect, "Instructions", inst_button_rect.collidepoint(mouse_pos))
+            ]:
+                # Create a temporary surface for alpha
+                temp_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+                color = button_hover if hover else button_color
+                temp_surf.fill(color)
+                self.screen.blit(temp_surf, rect.topleft)
+
+                # Draw the text
+                text_surf = button_font.render(text, True, (255, 255, 255))
+                self.screen.blit(text_surf, (rect.centerx - text_surf.get_width()//2,
+                                            rect.centery - text_surf.get_height()//2))
+
+            # --- Animate menu GIFs ---
+            frame_timer += self.clock.get_time()
+            if frame_timer >= frame_delay:
+                frame_index["Googley"] = (frame_index["Googley"] + 1) % len(googley_frames)
+                frame_index["Alex"] = (frame_index["Alex"] + 1) % len(alex_frames)
+                frame_timer = 0
+
+            # Draw Googley
+            googley_frame = googley_frames[frame_index["Googley"]]
+            self.screen.blit(googley_frame, (googley_pos[0] - googley_frame.get_width()//2, googley_pos[1] - googley_frame.get_height()//2))
+            googley_label = button_font.render("Googley", True, (255, 255, 255))
+            self.screen.blit(googley_label, (googley_pos[0] - googley_label.get_width()//2, googley_pos[1] + 40))
+
+            # Draw Alex
+            alex_frame = alex_frames[frame_index["Alex"]]
+            self.screen.blit(alex_frame, (alex_pos[0] - alex_frame.get_width()//2, alex_pos[1] - alex_frame.get_height()//2))
+            alex_label = button_font.render("Alex", True, (255, 255, 255))
+            self.screen.blit(alex_label, (alex_pos[0] - alex_label.get_width()//2, alex_pos[1] + 40))
 
             if mouse_click:
                 if sp_button_rect.collidepoint(mouse_pos):
@@ -281,6 +371,40 @@ class GameCanvas:
                     self.state = "character_select"
                     BACKGROUND_SOUND.play(loops=-1)
                     menu_running = False
+                elif inst_button_rect.collidepoint(mouse_pos):
+                    self.state = "instructions"
+                    menu_running = False
+
+            pygame.display.flip()
+            self.clock.tick(FPS)
+
+    def instructions(self):
+        running = True
+        font = pygame.font.SysFont("font_path", 28, bold=False)
+        lines = [
+            "INSTRUCTIONS",
+            "Player 1: WASD to move, SHIFT to attack",
+            "Player 2: Arrow keys to move, SHIFT to attack",
+            "Press P to pause the game",
+            "Reduce opponent health to 0 to win",
+            "",
+            "Click anywhere to go back to menu"
+        ]
+
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    self.state = "menu"
+                    running = False
+
+            self.screen.blit(self.background, (0, 0))
+
+            for i, line in enumerate(lines):
+                text_surf = font.render(line, True, (255, 255, 255))
+                self.screen.blit(text_surf, (SCREEN_WIDTH//2 - text_surf.get_width()//2, 100 + i*40))
 
             pygame.display.flip()
             self.clock.tick(FPS)
@@ -340,7 +464,7 @@ class GameCanvas:
     def character_select(self):
         """Show character selection screen for singleplayer or multiplayer."""
         choosing = True
-        font = pygame.font.SysFont("Arial", 36, bold=True)
+        font = pygame.font.SysFont("font_path", 36, bold=False)
 
         box_size = 120
         spacing = 150
@@ -356,14 +480,14 @@ class GameCanvas:
 
         characters = ["Googley", "Steve", "Alex"]
 
-        # 🔹 Load animated frames for previews
+        # Load animated frames for previews
         previews = {
             "Googley": self.load_gif_frames("assets/images/googley/idle.gif", scale=(64, 64)),
             "Steve": self.load_gif_frames("assets/images/steve/idle.gif", scale=(64, 64)),
             "Alex": self.load_gif_frames("assets/images/alex/idle.gif", scale=(64, 64)),
         }
 
-        # 🔹 Track animation state
+        # Track animation state
         frame_index = {char: 0 for char in characters}
         frame_timer = 0
         frame_delay = 150  # ms per frame (adjust for speed)
@@ -414,23 +538,26 @@ class GameCanvas:
                     frame_index[char] = (frame_index[char] + 1) % len(previews[char])
                 frame_timer = 0
 
-            # Draw character boxes
+            # Draw character boxes with transparency (no borders)
             for i, box in enumerate(boxes):
-                color = (100, 100, 100) if box.collidepoint(mouse_pos) else (50, 50, 50)
-                pygame.draw.rect(self.screen, color, box)
-                pygame.draw.rect(self.screen, (255, 255, 255), box, 3)
+                # Create temporary surface with alpha
+                temp_surf = pygame.Surface((box.width, box.height), pygame.SRCALPHA)
+                hover = box.collidepoint(mouse_pos)
+                color = (100, 100, 100, 180) if hover else (50, 50, 50, 150)  # RGBA for transparency
+                temp_surf.fill(color)
+                self.screen.blit(temp_surf, box.topleft)
 
-                # 🔹 Draw animated frame
+                # Draw animated frame
                 char = characters[i]
                 preview_img = previews[char][frame_index[char]]
                 self.screen.blit(
                     preview_img,
                     (box.centerx - preview_img.get_width() // 2,
-                    box.centery - preview_img.get_height() // 2),
+                    box.centery - preview_img.get_height() // 2)
                 )
 
-                # Label
-                label_surface = self.font.render(char, True, (255, 255, 255))
+                # Draw character label
+                label_surface = font.render(char, True, (255, 255, 255))
                 self.screen.blit(label_surface, (box.centerx - label_surface.get_width() // 2, box.bottom + 10))
 
             pygame.display.flip()
@@ -451,6 +578,8 @@ class GameCanvas:
                 self.character_select()
             elif not self.paused and not self.game_over and self.state == "playing":
                 self.update()
+            elif self.state == "instructions":
+                self.instructions()
 
             self.render()
             self.clock.tick(FPS)
