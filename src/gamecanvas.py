@@ -7,7 +7,7 @@ from sounds import BACKGROUND_SOUND
 from sprite import create_fighters
 from controls import Player1Controls, Player2Controls
 from ai import AIControls
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y
 from config import RED_SPAWN, BLUE_SPAWN
 
 
@@ -300,16 +300,28 @@ class GameCanvas:
         mp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 20, button_width, button_height)
         inst_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 120, button_width, button_height)
 
+        if not pygame.mixer.get_busy():
+            BACKGROUND_SOUND.play(loops=-1)
+
         # --- Load GIF frames for menu characters ---
-        googley_frames = self.load_gif_frames("assets/images/googley/idle.gif", scale=(64, 64))
-        alex_frames = self.load_gif_frames("assets/images/alex/idle.gif", scale=(64, 64))
-        frame_index = {"Googley": 0, "Alex": 0}
+        googley_frames = self.load_gif_frames("assets/images/googley/googley_right.gif", scale=(64, 64))
+        alex_frames = self.load_gif_frames("assets/images/alex/alex_right.gif", scale=(64, 64))
+        steve_frames = self.load_gif_frames("assets/images/steve/steve_right.gif", scale=(64, 64))
+        frame_index = {"Googley": 0, "Alex": 0, "Steve": 0}
         frame_timer = 0
         frame_delay = 150  # milliseconds per frame
 
-        # Position for GIFs
-        googley_pos = (SCREEN_WIDTH//4, SCREEN_HEIGHT//2 + 150)
-        alex_pos = (SCREEN_WIDTH*3//4, SCREEN_HEIGHT//2 + 150)
+        # Initial positions and velocities
+        positions = {
+            "Googley": [SCREEN_WIDTH//4, config.GROUND_Y],
+            "Alex": [SCREEN_WIDTH*3//4, config.GROUND_Y],
+            "Steve": [SCREEN_WIDTH//2, config.GROUND_Y]
+        }
+        velocities = {
+            "Googley": [1, 0],
+            "Alex": [-0.8, 0],
+            "Steve": [1.2, 0]
+        }
 
         while menu_running:
             self.handle_events()
@@ -318,10 +330,10 @@ class GameCanvas:
 
             self.screen.blit(self.background, (0, 0))
 
-             # --- Draw title ---
+            # --- Draw title ---
             title_surface = title_font.render("GOOGLEY FIGHTER", True, (255, 255, 255))
             title_x = SCREEN_WIDTH // 2 - title_surface.get_width() // 2
-            title_y = 120  # distance from top
+            title_y = 120
             self.screen.blit(title_surface, (title_x, title_y))
 
             # --- Draw buttons with transparency ---
@@ -330,41 +342,62 @@ class GameCanvas:
                 (mp_button_rect, "Multiplayer", mp_button_rect.collidepoint(mouse_pos)),
                 (inst_button_rect, "Instructions", inst_button_rect.collidepoint(mouse_pos))
             ]:
-                # Create a temporary surface for alpha
                 temp_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
                 color = button_hover if hover else button_color
                 temp_surf.fill(color)
                 self.screen.blit(temp_surf, rect.topleft)
 
-                # Draw the text
                 text_surf = button_font.render(text, True, (255, 255, 255))
                 self.screen.blit(text_surf, (rect.centerx - text_surf.get_width()//2,
                                             rect.centery - text_surf.get_height()//2))
 
-            # --- Animate menu GIFs ---
+            # --- Animate menu GIFs and update positions first ---
             frame_timer += self.clock.get_time()
             if frame_timer >= frame_delay:
-                frame_index["Googley"] = (frame_index["Googley"] + 1) % len(googley_frames)
-                frame_index["Alex"] = (frame_index["Alex"] + 1) % len(alex_frames)
+                for char in frame_index:
+                    frames = {"Googley": googley_frames, "Alex": alex_frames, "Steve": steve_frames}[char]
+                    frame_index[char] = (frame_index[char] + 1) % len(frames)
                 frame_timer = 0
 
-            # Draw Googley
-            googley_frame = googley_frames[frame_index["Googley"]]
-            self.screen.blit(googley_frame, (googley_pos[0] - googley_frame.get_width()//2, googley_pos[1] - googley_frame.get_height()//2))
-            googley_label = button_font.render("Googley", True, (255, 255, 255))
-            self.screen.blit(googley_label, (googley_pos[0] - googley_label.get_width()//2, googley_pos[1] + 40))
+            # --- Update positions and bounce along X-axis on the ground ---
+            for char, pos in positions.items():
+                vel = velocities[char]
+                pos[0] += vel[0]
 
-            # Draw Alex
-            alex_frame = alex_frames[frame_index["Alex"]]
-            self.screen.blit(alex_frame, (alex_pos[0] - alex_frame.get_width()//2, alex_pos[1] - alex_frame.get_height()//2))
-            alex_label = button_font.render("Alex", True, (255, 255, 255))
-            self.screen.blit(alex_label, (alex_pos[0] - alex_label.get_width()//2, alex_pos[1] + 40))
+                frame = {"Googley": googley_frames, "Alex": alex_frames, "Steve": steve_frames}[char][frame_index[char]]
+                w, h = frame.get_width(), frame.get_height()
 
+                # Keep on ground
+                pos[1] = config.GROUND_Y - h//2
+
+                # Bounce off left/right edges
+                if pos[0] - w//2 <= 0 or pos[0] + w//2 >= SCREEN_WIDTH:
+                    vel[0] *= -1
+
+                # Flip image depending on walking direction
+                img_to_draw = pygame.transform.flip(frame, vel[0] < 0, False)
+                self.screen.blit(img_to_draw, (pos[0] - w//2, pos[1] - h//2))
+
+            # --- Draw buttons after characters, so they appear in front ---
+            for rect, text, hover in [
+                (sp_button_rect, "Singleplayer", sp_button_rect.collidepoint(mouse_pos)),
+                (mp_button_rect, "Multiplayer", mp_button_rect.collidepoint(mouse_pos)),
+                (inst_button_rect, "Instructions", inst_button_rect.collidepoint(mouse_pos))
+            ]:
+                temp_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+                color = button_hover if hover else button_color
+                temp_surf.fill(color)
+                self.screen.blit(temp_surf, rect.topleft)
+
+                text_surf = button_font.render(text, True, (255, 255, 255))
+                self.screen.blit(text_surf, (rect.centerx - text_surf.get_width()//2,
+                                            rect.centery - text_surf.get_height()//2))
+
+            # --- Handle button clicks ---
             if mouse_click:
                 if sp_button_rect.collidepoint(mouse_pos):
                     self.selected_mode = "singleplayer"
                     self.state = "character_select"
-                    BACKGROUND_SOUND.play(loops=-1)
                     menu_running = False
                 elif mp_button_rect.collidepoint(mouse_pos):
                     self.selected_mode = "multiplayer"
