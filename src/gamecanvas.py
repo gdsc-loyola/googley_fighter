@@ -213,6 +213,8 @@ class GameCanvas:
 
         elif self.state == "playing":
             self.fighters.draw(self.screen)
+            for fighter in [self.red_fighter, self.blue_fighter]:
+                fighter.fireballs.draw(self.screen)
             self.draw_health_bars()
             self.draw_cooldown_bars()
             self.draw_timer()
