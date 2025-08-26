@@ -45,7 +45,7 @@ class Player1Controls(Controls):
             right=pygame.K_d,
             up=pygame.K_w,
             down=pygame.K_s,
-            attack=pygame.K_LSHIFT,
+            attack=pygame.K_SPACE,
             speed=5
         )
 
