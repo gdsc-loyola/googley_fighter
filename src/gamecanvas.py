@@ -3,7 +3,7 @@ import pygame
 import sys
 import config
 from PIL import Image
-from sounds import BACKGROUND_SOUND
+from sounds import BACKGROUND_SOUND, BUTTON_SOUND
 from sprite import create_fighters
 from controls import Player1Controls, Player2Controls
 from ai import AIControls
@@ -268,6 +268,7 @@ class GameCanvas:
 
                 # Handle button clicks
                 if mouse_click and rect.collidepoint(mouse_pos):
+                    BUTTON_SOUND.play()
                     if label == "CONTINUE":
                         self.paused = False
                         BACKGROUND_SOUND.play(loops=-1)
@@ -301,9 +302,10 @@ class GameCanvas:
         button_hover = (100, 100, 100, 220)
         button_width, button_height = 300, 60
 
-        sp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 - 80, button_width, button_height)
-        mp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 20, button_width, button_height)
-        inst_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 120, button_width, button_height)
+        sp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 - 70, button_width, button_height)
+        mp_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2, button_width, button_height)
+        inst_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 70, button_width, button_height)
+        quit_button_rect = pygame.Rect(SCREEN_WIDTH//2 - button_width//2, SCREEN_HEIGHT//2 + 140, button_width, button_height)
 
         if not pygame.mixer.get_busy():
             BACKGROUND_SOUND.play(loops=-1)
@@ -369,7 +371,8 @@ class GameCanvas:
             # --- Draw buttons AFTER sprites (buttons in front) ---
             for rect, text in [(sp_button_rect, "Singleplayer"),
                             (mp_button_rect, "Multiplayer"),
-                            (inst_button_rect, "Instructions")]:
+                            (inst_button_rect, "Instructions"),
+                            (quit_button_rect, "Quit")]:
                 temp_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
                 color = button_hover if rect.collidepoint(mouse_pos) else button_color
                 temp_surf.fill(color)
@@ -382,10 +385,12 @@ class GameCanvas:
             # --- Handle button clicks ---
             if mouse_click:
                 if sp_button_rect.collidepoint(mouse_pos):
+                    BUTTON_SOUND.play()
                     self.selected_mode = "singleplayer"
                     self.state = "character_select"
                     menu_running = False
                 elif mp_button_rect.collidepoint(mouse_pos):
+                    BUTTON_SOUND.play()
                     self.selected_mode = "multiplayer"
                     self.state = "character_select"
                     BACKGROUND_SOUND.play(loops=-1)
@@ -393,6 +398,9 @@ class GameCanvas:
                 elif inst_button_rect.collidepoint(mouse_pos):
                     self.state = "instructions"
                     menu_running = False
+                elif quit_button_rect.collidepoint(mouse_pos):
+                    pygame.quit()
+                    sys.exit()
 
             pygame.display.flip()
             self.clock.tick(FPS)
@@ -405,8 +413,6 @@ class GameCanvas:
             "Player 2: Arrow keys to move, SHIFT to attack",
             "Press P to pause the game",
             "Reduce opponent health to 0 to win",
-            "",
-            "Click anywhere to go back to menu"
         ]
 
         while running:
@@ -420,9 +426,9 @@ class GameCanvas:
 
             self.screen.blit(self.background, (0, 0))
 
-            # Render each line using your .ttf font
+            # Render instruction lines
             for i, line in enumerate(lines):
-                if i == 0:  # First line is the title
+                if i == 0:  # Title
                     text_surf = self.font_title.render(line, True, (255, 255, 255))
                     y_pos = 50
                 else:
@@ -525,6 +531,7 @@ class GameCanvas:
                     sys.exit()
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    BUTTON_SOUND.play()
                     for i, box in enumerate(boxes):
                         if box.collidepoint(event.pos):
                             if self.selected_mode == "singleplayer":
