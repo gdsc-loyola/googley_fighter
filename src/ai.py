@@ -11,21 +11,25 @@ class AIControls:
         self.target = target
         self.config = config
         self.attack_cooldown = 0
+        self.fireball_cooldown_timer = 0
         self.move_cooldown = 0   # delay between movement updates
 
     def get_input(self, fighter):
         """
-        Returns (dx, dy, attack) like player controls.
+        Returns (dx, dy, attack, fireball) like player controls.
         dx: -1 (left), 0 (idle), +1 (right)
         dy: -1 for jump
         attack: True/False
+        fireball: True/False
         """
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
+        if self.fireball_cooldown_timer > 0:
+            self.fireball_cooldown_timer -= 1
         if self.move_cooldown > 0:
             self.move_cooldown -= 1
 
-        dx, dy, attack = 0, 0, False
+        dx, dy, attack, fireball = 0, 0, False, False
 
         # Distance between AI and player
         dx_to_player = self.target.rect.centerx - self.fighter.rect.centerx
@@ -53,6 +57,12 @@ class AIControls:
                 attack = True
                 self.attack_cooldown = max(10, AI_ATTACK_COOLDOWN // 2 if health_ratio < 0.3 else AI_ATTACK_COOLDOWN)
 
+            # Fireball logic
+            fireball_chance = 0.1 if distance > AI_ATTACK_RANGE else 0.03
+            if self.fireball_cooldown_timer == 0 and random.random() < fireball_chance:
+                fireball = True
+                self.fireball_cooldown_timer = max(10, AI_ATTACK_COOLDOWN // 2 if health_ratio < 0.3 else AI_ATTACK_COOLDOWN)
+
             # Reset move cooldown
             self.move_cooldown = 4
 
@@ -60,4 +70,4 @@ class AIControls:
         if random.random() < (0.01 if health_ratio < 0.3 else 0.002):
             dy = -1
 
-        return dx, dy, attack
+        return dx, dy, attack, fireball

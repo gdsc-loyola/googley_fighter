@@ -2,6 +2,7 @@
 import pygame
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, GROUND_Y
 from sounds import DAMAGE_SOUND, DEATH_SOUND
+from fireball import Fireball
 from PIL import Image
 
 
@@ -14,6 +15,7 @@ class Fighter(pygame.sprite.Sprite):
         self.controls = controls
         self.speed = speed
         self.rect = pygame.Rect(x, y, 64, 64)
+        self.fireballs = pygame.sprite.Group()
 
         # Health system
         self.max_health = 100
@@ -37,6 +39,12 @@ class Fighter(pygame.sprite.Sprite):
         self.attack_range = 40
         self.attack_cooldown = 120
         self.attack_timer = 0
+
+        # Fireball system
+        self.is_shooting = False
+        self.fireball_damage = 8
+        self.fireball_cooldown = 120
+        self.fireball_timer = 0
 
         # Jump system
         self.is_jumping = False
@@ -126,6 +134,22 @@ class Fighter(pygame.sprite.Sprite):
                     # I am to the right of other → hit comes from right
                     other.take_damage(self.attack_damage, from_left=False)
 
+    def shoot_fireball(self):
+        if self.fireball_timer > 0:
+            return
+        
+        self.is_shooting = True
+        self.fireball_timer = self.fireball_cooldown
+
+        fb = Fireball(
+            x=self.rect.centerx,
+            y=self.rect.centery,
+            direction=1 if self.direction == "right" else -1,
+            owner=self,
+            damage=self.fireball_damage
+        )
+        self.fireballs.add(fb)
+
     def move(self, dx, dy, others):
         if dx > 0:
             self.direction = "right"
@@ -179,25 +203,31 @@ class Fighter(pygame.sprite.Sprite):
             self.frame_count = 0
             self.current_frame = (self.current_frame + 1) % len(frames)
             self.image = frames[self.current_frame]
+            
 
     def update(self, others):
         if self.controls:
-            dx, dy, attack = self.controls.get_input(self)
+            dx, dy, attack, fireball = self.controls.get_input(self)
             if dy < 0:
                 self.jump()
                 dy = 0
             self.move(dx, dy, others)
             if attack:
                 self.attack(others)
+            if fireball:
+                self.shoot_fireball()
 
         if self.damage_timer > 0:
             self.damage_timer -= 1
         if self.attack_timer > 0:
             self.attack_timer -= 1
+        if self.fireball_timer > 0:
+            self.fireball_timer -= 1
         if self.damage_anim_timer > 0:
             self.damage_anim_timer -= 1
         else:
             self.is_damaged = False
+        self.fireballs.update(others)
 
         self.animate()
 
