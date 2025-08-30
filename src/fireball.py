@@ -17,5 +17,6 @@ class Fireball(pygame.sprite.Sprite):
             self.kill()
         for fighter in fighters_group:
             if fighter != self.owner and self.rect.colliderect(fighter.rect):
-                fighter.take_damage(self.damage, from_left=(self.direction < 0))
+                from_left = self.rect.centerx < fighter.rect.centerx
+                fighter.take_damage(self.damage, from_left=from_left)
                 self.kill()
