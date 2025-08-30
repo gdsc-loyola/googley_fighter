@@ -424,9 +424,7 @@ class GameCanvas:
                     menu_running = False
                 elif mp_button_rect.collidepoint(mouse_pos):
                     BUTTON_SOUND.play()
-                    self.selected_mode = "multiplayer"
-                    self.state = "character_select"
-                    BACKGROUND_SOUND.play(loops=-1)
+                    self.show_message("Multiplayer mode is currently under development. Please come to our booth at Colayco Pavilion to try multiplayer!")
                     menu_running = False
                 elif inst_button_rect.collidepoint(mouse_pos):
                     self.state = "instructions"
@@ -437,6 +435,78 @@ class GameCanvas:
 
             pygame.display.flip()
             self.clock.tick(FPS)
+
+    def show_message(self, message):
+        """Display a popup message with automatic text wrapping and an OK button."""
+        running = True
+
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+
+        # --- Text wrapping ---
+        words = message.split(" ")
+        lines = []
+        current_line = ""
+
+        for word in words:
+            test_line = current_line + word + " "
+            test_surf = self.font_small.render(test_line, True, (255, 255, 255))
+            if test_surf.get_width() > SCREEN_WIDTH * 0.8:  # wrap if too wide
+                lines.append(current_line.strip())
+                current_line = word + " "
+            else:
+                current_line = test_line
+        lines.append(current_line.strip())
+
+        # OK button
+        button_width, button_height = 200, 60
+        ok_button_rect = pygame.Rect(
+            SCREEN_WIDTH // 2 - button_width // 2,
+            SCREEN_HEIGHT // 2 + 100,
+            button_width,
+            button_height
+        )
+
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if ok_button_rect.collidepoint(event.pos):
+                        BUTTON_SOUND.play()
+                        running = False
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Draw background + overlay
+            self.screen.blit(self.background, (0, 0))
+            self.screen.blit(overlay, (0, 0))
+
+            # Draw wrapped text
+            for i, line in enumerate(lines):
+                text_surf = self.font_small.render(line, True, (255, 255, 255))
+                text_rect = text_surf.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 60 + i * 30))
+                self.screen.blit(text_surf, text_rect)
+
+            # --- OK button ---
+            temp_surf = pygame.Surface((ok_button_rect.width, ok_button_rect.height), pygame.SRCALPHA)
+            if ok_button_rect.collidepoint(mouse_pos):
+                temp_surf.fill((100, 100, 100, 220))
+            else:
+                temp_surf.fill((50, 50, 50, 180))
+            self.screen.blit(temp_surf, ok_button_rect.topleft)
+
+            ok_surf = self.font_medium.render("OK", True, (255, 255, 255))
+            self.screen.blit(ok_surf, (ok_button_rect.centerx - ok_surf.get_width() // 2,
+                                    ok_button_rect.centery - ok_surf.get_height() // 2))
+
+            pygame.display.flip()
+            self.clock.tick(FPS)
+
+        # After closing, return to menu
+        self.state = "menu"
 
     def instructions(self):
         running = True
