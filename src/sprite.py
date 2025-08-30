@@ -39,11 +39,12 @@ class Fighter(pygame.sprite.Sprite):
         self.attack_range = 40
         self.attack_cooldown = 120
         self.attack_timer = 0
+        self.stun_timer = 0
 
         # Fireball system
         self.is_shooting = False
-        self.fireball_damage = 8
-        self.fireball_cooldown = 120
+        self.fireball_damage = 15
+        self.fireball_cooldown = 300
         self.fireball_timer = 0
 
         # Jump system
@@ -94,16 +95,13 @@ class Fighter(pygame.sprite.Sprite):
         return frames
 
     def take_damage(self, amount, from_left=True):
-        """Apply damage and trigger correct damage animation orientation."""
+        """Take damage and trigger damage animation if not on cooldown."""
         if self.damage_timer == 0:
             self.health -= amount
             if self.health < 0:
                 self.health = 0
 
-            # Select damage frames depending on attack direction
             self.active_damage_frames = self.damage_frames_right if from_left else self.damage_frames_left
-
-            # Start damage state
             self.is_damaged = True
             self.damage_timer = self.damage_cooldown
             self.damage_anim_timer = len(self.active_damage_frames) * self.damage_frame_delay if self.active_damage_frames else 30
@@ -113,6 +111,9 @@ class Fighter(pygame.sprite.Sprite):
             DAMAGE_SOUND.play()
             if self.health == 0:
                 DEATH_SOUND.play()
+
+            # --- Add stun here ---
+            self.stun_timer = 1 * 60  # 1 second at 60 FPS
 
     def attack(self, others):
         """Attack if not on cooldown."""
@@ -203,19 +204,23 @@ class Fighter(pygame.sprite.Sprite):
             self.frame_count = 0
             self.current_frame = (self.current_frame + 1) % len(frames)
             self.image = frames[self.current_frame]
-            
 
     def update(self, others):
-        if self.controls:
-            dx, dy, attack, fireball = self.controls.get_input(self)
-            if dy < 0:
-                self.jump()
-                dy = 0
-            self.move(dx, dy, others)
-            if attack:
-                self.attack(others)
-            if fireball:
-                self.shoot_fireball()
+        if self.stun_timer > 0:
+            self.stun_timer -= 1
+            # Still apply gravity/landing while stunned
+            self.move(0, 0, others)  
+        else:
+            if self.controls:
+                dx, dy, attack, fireballs = self.controls.get_input(self)
+                if dy < 0:
+                    self.jump()
+                    dy = 0
+                self.move(dx, dy, others)
+                if attack:
+                    self.attack(others)
+                if fireballs:
+                    self.shoot_fireball()
 
         if self.damage_timer > 0:
             self.damage_timer -= 1
