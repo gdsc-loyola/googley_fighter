@@ -1,15 +1,19 @@
 import os
 import pygame
 import sys
-import config
-from PIL import Image
-from sounds import BACKGROUND_SOUND, BUTTON_SOUND
-from sprite import create_fighters
-from controls import Player1Controls, Player2Controls
-from ai import AIControls
-from fireball import Fireball
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y
-from config import RED_SPAWN, BLUE_SPAWN
+from . import ai
+from . import config
+from . import sounds
+from . import sprite
+from . import controls
+from . import fireball
+from .sounds import BACKGROUND_SOUND, BUTTON_SOUND
+from .sprite import create_fighters
+from .controls import Player1Controls, Player2Controls
+from .ai import AIControls
+from .fireball import Fireball
+from .config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GROUND_Y
+from .config import RED_SPAWN, BLUE_SPAWN
 
 
 class GameCanvas:
@@ -340,9 +344,9 @@ class GameCanvas:
             BACKGROUND_SOUND.play(loops=-1)
 
         # Load GIF frames for menu characters
-        googley_frames = self.load_gif_frames("assets/images/googley/googley_right.gif", scale=(64, 64))
-        alex_frames = self.load_gif_frames("assets/images/alex/alex_right.gif", scale=(64, 64))
-        steve_frames = self.load_gif_frames("assets/images/steve/steve_right.gif", scale=(64, 64))
+        googley_frames = self.load_spritesheet("assets/images/googley/googley_right.png", 64, 32, scale=(64, 64))
+        alex_frames = self.load_spritesheet("assets/images/alex/alex_right.png", 64, 32, scale=(64, 64))
+        steve_frames = self.load_spritesheet("assets/images/steve/steve_right.png", 64, 32, scale=(64, 64))
         frame_index = {"Googley": 0, "Alex": 0, "Steve": 0}
         frame_timer = 0
         frame_delay = 150  # ms per frame
@@ -387,15 +391,26 @@ class GameCanvas:
                 vel = velocities[char]
                 pos[0] += vel[0]
 
-                frame = {"Googley": googley_frames, "Alex": alex_frames, "Steve": steve_frames}[char][frame_index[char]]
-                w, h = frame.get_width(), frame.get_height()
-                pos[1] = config.GROUND_Y - h//2
+                frames = {"Googley": googley_frames, "Alex": alex_frames, "Steve": steve_frames}[char]
 
-                if pos[0] - w//2 <= 0 or pos[0] + w//2 >= SCREEN_WIDTH:
+                if frames and len(frames) > 0:
+                    frame = frames[frame_index[char]]
+                else:
+                    # fallback: placeholder red box
+                    if frame_index[char] != -1:  # print only once per char
+                        print(f"[WARN] {char} has 0 frames loaded! Check spritesheet path.")
+                        frame_index[char] = -1
+                    frame = pygame.Surface((64, 64))
+                    frame.fill((255, 0, 0))
+
+                w, h = frame.get_width(), frame.get_height()
+                pos[1] = config.GROUND_Y - h // 2
+
+                if pos[0] - w // 2 <= 0 or pos[0] + w // 2 >= SCREEN_WIDTH:
                     vel[0] *= -1
 
                 img_to_draw = pygame.transform.flip(frame, vel[0] < 0, False)
-                self.screen.blit(img_to_draw, (pos[0] - w//2, pos[1] - h//2))
+                self.screen.blit(img_to_draw, (pos[0] - w // 2, pos[1] - h // 2))
 
             # --- Draw buttons AFTER sprites (buttons in front) ---
             for rect, text in [(sp_button_rect, "Singleplayer"),
@@ -424,9 +439,7 @@ class GameCanvas:
                     menu_running = False
                 elif mp_button_rect.collidepoint(mouse_pos):
                     BUTTON_SOUND.play()
-                    self.selected_mode = "multiplayer"
-                    self.state = "character_select"
-                    BACKGROUND_SOUND.play(loops=-1)
+                    self.show_message("Multiplayer mode is currently under development. Please come to our booth at Colayco Pavilion to try multiplayer!")
                     menu_running = False
                 elif inst_button_rect.collidepoint(mouse_pos):
                     self.state = "instructions"
@@ -437,6 +450,78 @@ class GameCanvas:
 
             pygame.display.flip()
             self.clock.tick(FPS)
+
+    def show_message(self, message):
+        """Display a popup message with automatic text wrapping and an OK button."""
+        running = True
+
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+
+        # --- Text wrapping ---
+        words = message.split(" ")
+        lines = []
+        current_line = ""
+
+        for word in words:
+            test_line = current_line + word + " "
+            test_surf = self.font_small.render(test_line, True, (255, 255, 255))
+            if test_surf.get_width() > SCREEN_WIDTH * 0.8:  # wrap if too wide
+                lines.append(current_line.strip())
+                current_line = word + " "
+            else:
+                current_line = test_line
+        lines.append(current_line.strip())
+
+        # OK button
+        button_width, button_height = 200, 60
+        ok_button_rect = pygame.Rect(
+            SCREEN_WIDTH // 2 - button_width // 2,
+            SCREEN_HEIGHT // 2 + 100,
+            button_width,
+            button_height
+        )
+
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if ok_button_rect.collidepoint(event.pos):
+                        BUTTON_SOUND.play()
+                        running = False
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Draw background + overlay
+            self.screen.blit(self.background, (0, 0))
+            self.screen.blit(overlay, (0, 0))
+
+            # Draw wrapped text
+            for i, line in enumerate(lines):
+                text_surf = self.font_small.render(line, True, (255, 255, 255))
+                text_rect = text_surf.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 60 + i * 30))
+                self.screen.blit(text_surf, text_rect)
+
+            # --- OK button ---
+            temp_surf = pygame.Surface((ok_button_rect.width, ok_button_rect.height), pygame.SRCALPHA)
+            if ok_button_rect.collidepoint(mouse_pos):
+                temp_surf.fill((100, 100, 100, 220))
+            else:
+                temp_surf.fill((50, 50, 50, 180))
+            self.screen.blit(temp_surf, ok_button_rect.topleft)
+
+            ok_surf = self.font_medium.render("OK", True, (255, 255, 255))
+            self.screen.blit(ok_surf, (ok_button_rect.centerx - ok_surf.get_width() // 2,
+                                    ok_button_rect.centery - ok_surf.get_height() // 2))
+
+            pygame.display.flip()
+            self.clock.tick(FPS)
+
+        # After closing, return to menu
+        self.state = "menu"
 
     def instructions(self):
         running = True
@@ -475,30 +560,20 @@ class GameCanvas:
             pygame.display.flip()
             self.clock.tick(FPS)
 
-    def load_gif_frames(self, path, scale=None):
-        """Load GIF frames as a list of PyGame surfaces."""
-        pil_img = Image.open(path)
+    def load_spritesheet(self, path, frame_width, frame_height, scale=None):
+        """Load a sprite sheet and return frames as a list of surfaces."""
+        sheet = pygame.image.load(path).convert_alpha()
         frames = []
-        palette = pil_img.getpalette()  # store palette for reuse
+        sheet_width, sheet_height = sheet.get_size()
 
-        try:
-            while True:
-                frame = pil_img.convert("RGBA")  # ensure proper format
-                if scale:
-                    frame = frame.resize(scale, Image.NEAREST)
-
-                # Only apply palette if image mode is "P"
-                if pil_img.mode == "P" and palette:
-                    pil_img.putpalette(palette)
-
-                mode = frame.mode
-                size = frame.size
-                data = frame.tobytes()
-                surface = pygame.image.fromstring(data, size, mode)
-                frames.append(surface)
-                pil_img.seek(pil_img.tell() + 1)
-        except EOFError:
-            pass
+        for y in range(0, sheet_height, frame_height):
+            for x in range(0, sheet_width, frame_width):
+                # Only add if the frame fits fully inside the image
+                if x + frame_width <= sheet_width and y + frame_height <= sheet_height:
+                    frame = sheet.subsurface(pygame.Rect(x, y, frame_width, frame_height))
+                    if scale:
+                        frame = pygame.transform.scale(frame, scale)
+                    frames.append(frame)
 
         return frames
 
@@ -547,9 +622,9 @@ class GameCanvas:
 
         # Load animated frames for previews
         previews = {
-            "Googley": self.load_gif_frames("assets/images/googley/idle.gif", scale=(64, 64)),
-            "Steve": self.load_gif_frames("assets/images/steve/idle.gif", scale=(64, 64)),
-            "Alex": self.load_gif_frames("assets/images/alex/idle.gif", scale=(64, 64)),
+            "Googley": self.load_spritesheet("assets/images/googley/idle.png", 64, 32, scale=(64, 64)),
+            "Steve": self.load_spritesheet("assets/images/steve/idle.png", 64, 32, scale=(64, 64)),
+            "Alex": self.load_spritesheet("assets/images/alex/idle.png", 64, 32, scale=(64, 64)),
         }
 
         # Track animation state
