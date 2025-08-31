@@ -1,9 +1,11 @@
 # src/sprite.py
 import pygame
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, GROUND_Y
-from sounds import DAMAGE_SOUND, DEATH_SOUND
-from fireball import Fireball
-from PIL import Image
+from . import config
+from . import sounds
+from . import fireball
+from .config import SCREEN_WIDTH, SCREEN_HEIGHT, GROUND_Y
+from .sounds import DAMAGE_SOUND, DEATH_SOUND
+from .fireball import Fireball
 
 
 class Fighter(pygame.sprite.Sprite):
@@ -54,7 +56,7 @@ class Fighter(pygame.sprite.Sprite):
         self.vertical_speed = 0
         self.max_jump_height = GROUND_Y - 150
 
-        # GIF frames
+        # PNG frames
         self.frames_right = []
         self.frames_left = []
         self.current_frame = 0
@@ -64,34 +66,52 @@ class Fighter(pygame.sprite.Sprite):
         self.image = pygame.Surface((64, 64))
         self.image.fill(color)
 
-        # Load GIFs
+        # PNG sprite sheets
         if gif_right:
-            self.frames_right = self.load_gif(gif_right, scale=(64, 64))
+            self.frames_right = self.load_spritesheet(gif_right, scale=(64, 64))
         if gif_left:
-            self.frames_left = self.load_gif(gif_left, scale=(64, 64))
+            self.frames_left = self.load_spritesheet(gif_left, scale=(64, 64))
         if damage_right_gif:
-            self.damage_frames_right = self.load_gif(damage_right_gif, scale=(64, 64))
+            self.damage_frames_right = self.load_spritesheet(damage_right_gif, scale=(64, 64))
         if damage_left_gif:
-            self.damage_frames_left = self.load_gif(damage_left_gif, scale=(64, 64))
+            self.damage_frames_left = self.load_spritesheet(damage_left_gif, scale=(64, 64))
+
+        # Set default image to first right frame if available
+        if self.frames_right:
+            self.image = self.frames_right[0]
 
         self.direction = "right"
 
-    def load_gif(self, path, scale=None):
-        pil_image = Image.open(path)
+    def load_spritesheet(self, path, frame_width=None, frame_height=None, scale=None):
+        """Load a sprite sheet and slice into frames safely."""
+        sheet = pygame.image.load(path).convert_alpha()
         frames = []
-        try:
-            while True:
-                frame = pil_image.convert("RGBA")
+        sheet_width, sheet_height = sheet.get_size()
+
+        # Auto-detect frame height if not given
+        if frame_height is None:
+            frame_height = sheet_height  # single row
+        if frame_width is None:
+            # Guess width by checking for common cases
+            if sheet_width % sheet_height == 0:
+                frame_width = sheet_height  # square frames
+            else:
+                frame_width = sheet_width  # single frame
+
+        for y in range(0, sheet_height, frame_height):
+            for x in range(0, sheet_width, frame_width):
+                if x + frame_width > sheet_width or y + frame_height > sheet_height:
+                    continue
+                frame = sheet.subsurface(pygame.Rect(x, y, frame_width, frame_height))
                 if scale:
-                    frame = frame.resize(scale, Image.NEAREST)
-                mode = frame.mode
-                size = frame.size
-                data = frame.tobytes()
-                surface = pygame.image.fromstring(data, size, mode)
-                frames.append(surface)
-                pil_image.seek(pil_image.tell() + 1)
-        except EOFError:
-            pass
+                    frame = pygame.transform.scale(frame, scale)
+                frames.append(frame)
+
+        if not frames:
+            print(f"[WARN] No frames loaded from {path}. "
+                f"Tried {frame_width}x{frame_height} on {sheet_width}x{sheet_height}")
+        else:
+            print(f"[INFO] Loaded {len(frames)} frames from {path}")
         return frames
 
     def take_damage(self, amount, from_left=True):
@@ -240,10 +260,10 @@ class Fighter(pygame.sprite.Sprite):
 def create_fighters(player1_choice, player2_choice, player1_controls, player2_controls):
     def get_paths(name):
         return (
-            f"assets/images/{name}/{name}_right.gif",
-            f"assets/images/{name}/{name}_left.gif",
-            f"assets/images/{name}/damage_right.gif",
-            f"assets/images/{name}/damage_left.gif"
+            f"assets/images/{name}/{name}_right.png",
+            f"assets/images/{name}/{name}_left.png",
+            f"assets/images/{name}/damage_right.png",
+            f"assets/images/{name}/damage_left.png"
         )
 
     p1_right, p1_left, p1_damage_r, p1_damage_l = get_paths(player1_choice)

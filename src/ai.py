@@ -1,6 +1,7 @@
 # src/ai.py
 import random
-from config import AI_ATTACK_RANGE, AI_ATTACK_COOLDOWN
+from . import config
+from .config import AI_ATTACK_RANGE, AI_ATTACK_COOLDOWN
 
 
 class AIControls:
